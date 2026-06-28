@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mapa Turístico de Cali — Eje 4: Historia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black:      #22313f;
+      --white:      #ffffff;
+      --bg:         #f5f5f5;
+      --border:     #d9dde2;
+      --muted:      #6b7580;
+      --subtle:     #eef1f4;
+      --header-bg:  #00487F;
+      --active:     #F28D27;
+      --active-pale:#FCE4CC;
+    }
+
+    html, body { height: 570px; min-height: 570px; max-height: 570px; font-family: 'Inter', system-ui, -apple-system, sans-serif; background: transparent; color: var(--black); }
+    body { display: flex; flex-direction: column; height: 570px; min-height: 570px; max-height: 570px; overflow: hidden; background: transparent; }
+
+    .header { flex-shrink: 0; background: var(--header-bg); color: var(--white); padding: 10px 20px 0; display: flex; flex-direction: column; }
+    /* ---- Embed-only layout refinements ---- */
+    .header { display: none !important; }
+    .main { height: 100%; min-height: 0; }
+    .sidebar { width: 310px; border-radius: 28px 0 0 0; overflow: hidden; }
+    .sidebar-header { padding: 18px 18px 14px; }
+    .sidebar-badge { font-size: 10px; padding: 4px 10px; margin-bottom: 10px; }
+    .sidebar-title { font-size: 15px; }
+    .sidebar-hint { font-size: 12px; }
+    .loc-list { padding: 10px 12px; gap: 5px; }
+    .loc-item { padding: 10px; border-radius: 10px; }
+    .loc-thumb, .loc-thumb-empty { width: 42px; height: 42px; border-radius: 8px; }
+    .loc-name { font-size: 13px; }
+    .loc-type { font-size: 11px; }
+    .main > div:last-child { border-radius: 0 28px 0 0; overflow: hidden; }
+    #map { border-radius: 0 28px 0 0; }
+    .map-loading { border-radius: 0 28px 0 0; }
+    .route-mode-banner { top: 14px; }
+
+    .header-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 10px; }
+    .header-eyebrow { font-size: 9px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.5; margin-bottom: 2px; }
+    .header-title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 440px; }
+    .header-meta { display: flex; gap: 16px; flex-shrink: 0; }
+    .meta-chip { display: flex; flex-direction: column; align-items: flex-end; }
+    .meta-chip-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.45; }
+    .meta-chip-value { font-size: 12px; font-weight: 600; }
+
+    .eje-tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+    .eje-tabs::-webkit-scrollbar { display: none; }
+    .eje-tab { flex-shrink: 0; padding: 8px 14px; font-size: 11px; font-weight: 600; border-radius: 8px 8px 0 0; cursor: pointer; border: none; font-family: inherit; color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.07); transition: all 0.15s; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+    .eje-tab:hover  { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.85); }
+    .eje-tab.active { background: var(--bg); color: var(--black); }
+    .eje-tab-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    .main { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+    .sidebar { width: 268px; flex-shrink: 0; background: var(--white); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; z-index: 10; }
+    .sidebar-header { padding: 14px 16px 12px; border-bottom: 1px solid var(--border); background: var(--subtle); flex-shrink: 0; }
+    .sidebar-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; padding: 3px 9px; border-radius: 10px; margin-bottom: 7px; }
+    .sidebar-title { font-size: 12.5px; font-weight: 700; line-height: 1.35; margin-bottom: 4px; }
+    .sidebar-hint { font-size: 10px; color: var(--muted); line-height: 1.5; }
+    .loc-list { flex: 1; overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
+    .loc-item { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 8px; cursor: pointer; border: 1.5px solid transparent; transition: background 0.12s, border-color 0.12s; user-select: none; background: none; width: 100%; text-align: left; font-family: inherit; }
+    .loc-item:hover  { background: var(--bg); }
+    .loc-item.active { border-color: var(--active); background: var(--active-pale); }
+    .loc-badge { width: 26px; height: 26px; border-radius: 50%; background: var(--active); color: var(--white); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .loc-thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border); background: var(--subtle); display: block; }
+    .loc-thumb-empty { width: 36px; height: 36px; border-radius: 6px; flex-shrink: 0; background: var(--subtle); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 14px; }
+    .loc-text { flex: 1; min-width: 0; }
+    .loc-name { font-size: 11.5px; font-weight: 600; line-height: 1.3; }
+    .loc-type { font-size: 9.5px; color: var(--muted); margin-top: 2px; text-transform: capitalize; }
+    .loc-item.active .loc-type { color: var(--active); opacity: 0.85; }
+
+    #map { flex: 1; z-index: 1; }
+
+    .map-loading { position: absolute; inset: 0; background: rgba(242,244,238,0.88); display: flex; align-items: center; justify-content: center; z-index: 500; flex-direction: column; gap: 10px; pointer-events: none; }
+    .map-loading.hidden { display: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--active); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    .loading-text { font-size: 12px; color: var(--muted); font-weight: 500; }
+
+    .detail-panel { position: absolute; top: 14px; right: 14px; bottom: 14px; width: 304px; z-index: 800; display: none; flex-direction: column; background: var(--white); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 6px 30px rgba(0,0,0,0.14); overflow: hidden; }
+    .detail-panel.visible { display: flex; }
+    .detail-img-wrap { position: relative; flex-shrink: 0; height: 175px; }
+    .detail-img { width: 100%; height: 175px; object-fit: cover; display: none; }
+    .detail-img-fallback { width: 100%; height: 175px; background: var(--subtle); display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); gap: 7px; font-size: 11px; text-align: center; padding: 10px; }
+    .detail-close { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.5); background: rgba(0,0,0,0.32); cursor: pointer; display: flex; align-items: center; justify-content: center; color: #fff; z-index: 2; transition: background 0.12s; font-family: inherit; }
+    .detail-close:hover { background: rgba(0,0,0,0.55); }
+    .detail-body { padding: 16px 16px 0; overflow-y: auto; flex: 1; }
+    .detail-eje-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; padding: 3px 9px; border-radius: 10px; margin-bottom: 8px; }
+    .detail-name { font-size: 16px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; margin-bottom: 3px; }
+    .detail-type { font-size: 10px; color: var(--muted); text-transform: capitalize; margin-bottom: 11px; }
+    .detail-desc { font-size: 12.5px; color: #555; line-height: 1.65; margin-bottom: 14px; }
+    .no-coords-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 9px; font-weight: 600; padding: 3px 8px; border-radius: 8px; margin-bottom: 10px; background: #fff8e1; color: #856404; border: 1px solid #ffe082; }
+    .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 8px; }
+    .dist-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+    .dist-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--subtle); border-radius: 6px; }
+    .dist-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dist-name { flex: 1; font-size: 11px; font-weight: 500; line-height: 1.3; }
+    .dist-vals { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+    .dist-km { font-size: 11px; font-weight: 700; color: var(--black); }
+    .dist-approx { font-size: 9px; color: var(--muted); }
+    .btn-como-llegar { width: 100%; padding: 10px 14px; border-radius: 8px; border: none; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; transition: filter 0.15s, transform 0.1s; }
+    .btn-como-llegar:hover   { filter: brightness(0.92); transform: translateY(-1px); }
+    .btn-como-llegar:active  { transform: translateY(0); }
+    .btn-como-llegar:disabled { opacity: 0.6; cursor: not-allowed; transform: none; filter: none; }
+    .geo-result { border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; font-size: 11.5px; line-height: 1.55; }
+    .geo-result.success { background: var(--active-pale); color: var(--active); }
+    .geo-result.error   { background: #feecec; color: #a33; }
+    .geo-result.loading { background: var(--subtle); color: var(--muted); }
+    .geo-row { display: flex; align-items: center; gap: 6px; }
+    .geo-stats { margin-top: 7px; display: flex; gap: 14px; flex-wrap: wrap; }
+    .geo-stat-val   { font-weight: 700; font-size: 13px; display: block; }
+    .geo-stat-label { font-size: 9.5px; opacity: 0.7; }
+    .geo-note { margin-top: 5px; font-size: 9.5px; opacity: 0.65; }
+
+    /* ---- Route mode banner ---- */
+    .route-mode-banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 700; background: var(--header-bg); color: var(--white); padding: 10px 18px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,.3); display: none; align-items: center; gap: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: auto; }
+    .route-mode-banner.visible { display: flex; }
+    .route-banner-cancel { background: rgba(255,255,255,.15); border: 1.5px solid rgba(255,255,255,.3); color: #fff; border-radius: 6px; padding: 4px 11px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .12s; }
+    .route-banner-cancel:hover { background: rgba(255,255,255,.28); }
+    /* ---- Transport mode cards ---- */
+    .transport-cards { display: flex; gap: 6px; margin-top: 8px; }
+    .t-card { flex: 1; background: var(--white); border: 1.5px solid var(--border); border-radius: 8px; padding: 9px 4px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .t-card.highlight { border-color: var(--border); background: var(--white); }
+    .t-card-icon  { font-size: 18px; line-height: 1; }
+    .t-card-val   { font-size: 12px; font-weight: 700; color: var(--black); }
+    .t-card-label { font-size: 9px; color: var(--muted); text-align: center; line-height: 1.3; }
+    /* ---- Connect button ---- */
+    .btn-conectar { width: 100%; margin-top: 7px; padding: 9px 14px; border-radius: 8px; border: 1.5px solid var(--border); cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 7px; background: var(--white); color: var(--black); transition: background .12s, border-color .12s; }
+    .btn-conectar:hover { background: var(--subtle); border-color: var(--active); color: var(--active); }
+    .btn-conectar.route-active { background: var(--active-pale); border-color: var(--active); color: var(--active); }
+    .detail-footer { padding: 12px 16px 16px; flex-shrink: 0; border-top: 1px solid var(--border); background: var(--bg); }
+
+    .bottom-sheet { position: fixed; inset: auto 0 0; z-index: 900; background: var(--white); border-radius: 16px 16px 0 0; box-shadow: 0 -6px 32px rgba(0,0,0,0.17); transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.25,1,0.5,1); display: none; flex-direction: column; max-height: 88dvh; overflow: hidden; }
+    .bottom-sheet.visible { display: flex; transform: translateY(0); }
+    .bs-drag { width: 36px; height: 4px; border-radius: 2px; background: var(--border); margin: 10px auto 4px; flex-shrink: 0; }
+    .bs-img  { width: 100%; height: 155px; object-fit: cover; display: none; flex-shrink: 0; }
+    .bs-img-fallback { width: 100%; height: 110px; flex-shrink: 0; background: var(--subtle); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 11px; }
+    .bs-body { padding: 14px 16px 0; overflow-y: auto; flex: 1; }
+    .bs-close { position: absolute; top: 18px; right: 14px; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--white); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--muted); font-family: inherit; z-index: 2; }
+    .bs-name { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 3px; }
+    .bs-type { font-size: 10px; color: var(--muted); text-transform: capitalize; margin-bottom: 9px; }
+    .bs-desc { font-size: 12.5px; color: #555; line-height: 1.65; margin-bottom: 12px; }
+    .bs-footer { padding: 10px 16px 20px; flex-shrink: 0; border-top: 1px solid var(--border); background: var(--bg); }
+
+    .user-dot { width: 16px; height: 16px; border-radius: 50%; background: #1f1f1f; border: 3px solid #fff; box-shadow: 0 0 0 3px rgba(31,31,31,.25), 0 2px 8px rgba(0,0,0,.22); }
+
+    .leaflet-control-zoom { border: 1px solid var(--border) !important; box-shadow: 0 1px 6px rgba(0,0,0,.1) !important; }
+    .leaflet-control-zoom a { color: var(--black) !important; border-bottom: 1px solid var(--border) !important; font-family: 'Inter',system-ui,sans-serif !important; font-weight: 500 !important; }
+    .leaflet-control-zoom a:hover { background: var(--bg) !important; }
+    .leaflet-control-attribution { font-family: 'Inter',system-ui,sans-serif !important; font-size: 9px !important; color: var(--muted) !important; }
+    .map-tooltip { background: var(--header-bg) !important; color: var(--white) !important; border: none !important; border-radius: 4px !important; font-family: 'Inter',system-ui,sans-serif !important; font-size: 11px !important; font-weight: 600 !important; padding: 5px 9px !important; box-shadow: 0 2px 8px rgba(0,0,0,.2) !important; pointer-events: none !important; }
+    .map-tooltip::before { border-top-color: var(--header-bg) !important; }
+
+    @media (max-width: 768px) {
+      .sidebar      { display: none; }
+      .detail-panel { display: none !important; }
+      .header-meta  { display: none; }
+      .header-title { font-size: 13px; max-width: 220px; }
+      .eje-tab      { padding: 7px 10px; font-size: 10px; }
+    }
+    @media (min-width: 769px) {
+      .bottom-sheet { display: none !important; }
+    }
+
+    /* ---- Interfaz revisada: mayor legibilidad y mapa con más contraste ---- */
+    :root {
+      --black: #20221f;
+      --white: #ffffff;
+      --bg: #eef0ea;
+      --border: #c8cdc1;
+      --muted: #596258;
+      --subtle: #e4e8df;
+    }
+    .header { padding: 14px 24px 0; }
+    .header-top { gap: 18px; padding-bottom: 12px; }
+    .header-eyebrow { font-size: 10px; margin-bottom: 4px; }
+    .header-title { font-size: 20px; max-width: 620px; }
+    .header-meta { gap: 20px; }
+    .meta-chip-label { font-size: 10px; }
+    .meta-chip-value { font-size: 14px; }
+    .eje-tabs { gap: 4px; }
+    .eje-tab { padding: 10px 16px; font-size: 13px; gap: 8px; }
+    .eje-tab-dot { width: 9px; height: 9px; }
+
+    .sidebar { width: 328px; }
+    .sidebar-header { padding: 16px 18px 14px; }
+    .sidebar-badge { font-size: 10px; padding: 4px 10px; margin-bottom: 9px; }
+    .sidebar-title { font-size: 15px; line-height: 1.35; margin-bottom: 5px; }
+    .sidebar-hint { font-size: 12px; line-height: 1.45; }
+    .loc-list { padding: 10px 12px; gap: 5px; }
+    .loc-item { gap: 10px; padding: 10px; border-radius: 10px; }
+    .loc-badge { width: 30px; height: 30px; font-size: 12px; }
+    .loc-thumb, .loc-thumb-empty { width: 42px; height: 42px; border-radius: 8px; }
+    .loc-name { font-size: 13px; line-height: 1.3; }
+    .loc-type { font-size: 11px; margin-top: 3px; }
+
+    .detail-panel { top: 10px; right: 10px; bottom: 10px; width: min(382px, calc(100% - 20px)); border-radius: 14px; }
+    .detail-img-wrap, .detail-img, .detail-img-fallback { height: 184px; }
+    .detail-img-fallback { font-size: 12px; }
+    .detail-body { padding: 17px 18px 4px; }
+    .detail-eje-tag { font-size: 10px; padding: 4px 10px; margin-bottom: 10px; }
+    .detail-name { font-size: 21px; line-height: 1.18; margin-bottom: 5px; }
+    .detail-type { font-size: 12px; margin-bottom: 12px; }
+    .detail-desc { font-size: 14px; line-height: 1.58; margin-bottom: 14px; color: #40463e; }
+    .no-coords-badge { font-size: 11px; gap: 6px; padding: 5px 9px; margin-bottom: 10px; }
+    .detail-footer { padding: 12px 18px 16px; }
+    .btn-como-llegar { min-height: 44px; padding: 11px 14px; font-size: 14px; }
+    .btn-conectar { min-height: 42px; margin-top: 8px; padding: 10px 14px; font-size: 13px; }
+    .geo-result { border-radius: 10px; padding: 11px 12px; margin-bottom: 10px; font-size: 12px; line-height: 1.5; }
+    .geo-row { gap: 8px; }
+
+    .route-mode-banner { top: 14px; padding: 11px 15px; border-radius: 12px; gap: 10px; font-size: 13px; }
+    .route-banner-cancel { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; font-size: 12px; }
+    .transport-cards { gap: 8px; margin-top: 9px; }
+    .t-card { padding: 10px 5px; gap: 4px; border-radius: 10px; }
+    .t-card-icon { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--black); }
+    .t-card-val { font-size: 13px; }
+    .t-card-label { font-size: 10px; }
+    .geo-note { display: flex; align-items: flex-start; gap: 5px; margin-top: 7px; font-size: 10px; }
+    .geo-diagnostic { margin-top: 7px; font-size: 10px; line-height: 1.45; opacity: .8; }
+
+    .bottom-sheet { border-radius: 18px 18px 0 0; max-height: 90dvh; }
+    .bs-img { height: 174px; }
+    .bs-img-fallback { height: 124px; font-size: 12px; }
+    .bs-body { padding: 16px 18px 2px; }
+    .bs-name { font-size: 21px; line-height: 1.18; margin-bottom: 5px; }
+    .bs-type { font-size: 12px; margin-bottom: 11px; }
+    .bs-desc { font-size: 14px; line-height: 1.58; margin-bottom: 14px; }
+    .bs-footer { padding: 12px 18px 22px; }
+
+    /* Cartografía clara: se conserva el color original del mapa para que calles, barrios y referencias sean legibles. */
+    #map .leaflet-tile-pane { filter: none; }
+    .leaflet-control-zoom a { font-size: 19px !important; }
+    .leaflet-control-attribution { font-size: 10px !important; }
+    .map-tooltip { font-size: 12px !important; padding: 6px 10px !important; }
+
+    @media (max-width: 768px) {
+      .header { padding: 12px 14px 0; }
+      .header-title { font-size: 17px; max-width: 270px; }
+      .header-eyebrow { font-size: 9px; }
+      .eje-tab { padding: 9px 12px; font-size: 12px; }
+      .route-mode-banner { max-width: calc(100% - 24px); white-space: normal; }
+    }
+
+
+    /* ---- Layout responsive reforzado ---- */
+    html, body { min-width: 0; min-height: 100%; }
+    .main, .main > div, #map { min-width: 0; min-height: 0; }
+    .main > div { display: flex; }
+    #map { width: 100% !important; height: 100% !important; }
+
+    /* El panel usa una cuadrícula: imagen, contenido con scroll y acciones.
+       Esto evita que la descripción quede debajo del pie en ventanas bajas. */
+    .detail-panel.visible {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      min-height: 0;
+    }
+    .detail-img-wrap { min-width: 0; }
+    .detail-body {
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
+      -webkit-overflow-scrolling: touch;
+    }
+    .detail-footer {
+      min-width: 0;
+      max-height: min(43%, 320px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
+    }
+    .detail-desc, .geo-result, .route-mode-banner, .loc-name, .sidebar-title {
+      overflow-wrap: anywhere;
+      word-break: normal;
+    }
+    .detail-panel .detail-img-wrap,
+    .detail-panel .detail-img,
+    .detail-panel .detail-img-fallback {
+      height: clamp(122px, 20vh, 184px);
+    }
+
+    /* En anchos de escritorio intermedios se reduce el ancho de los paneles,
+       conservando un mapa utilizable y sin cortar textos. */
+    @media (min-width: 769px) and (max-width: 1180px) {
+      .header { padding: 12px 18px 0; }
+      .header-title { font-size: 18px; max-width: 410px; }
+      .header-meta { gap: 14px; }
+      .eje-tab { padding: 9px 12px; font-size: 12px; }
+      .sidebar { width: 290px; }
+      .sidebar-header { padding: 14px 15px 12px; }
+      .loc-list { padding: 8px 9px; }
+      .loc-item { padding: 9px; gap: 9px; }
+      .loc-thumb, .loc-thumb-empty { width: 38px; height: 38px; }
+      .loc-name { font-size: 12px; }
+      .detail-panel { width: min(348px, calc(100% - 16px)); right: 8px; top: 8px; bottom: 8px; }
+      .detail-body { padding: 14px 15px 3px; }
+      .detail-footer { padding: 10px 15px 13px; }
+      .detail-name { font-size: 19px; }
+      .detail-desc { font-size: 13px; }
+    }
+
+    @media (min-width: 769px) and (max-width: 920px) {
+      .sidebar { width: 252px; }
+      .sidebar-title { font-size: 14px; }
+      .sidebar-hint { font-size: 11px; }
+      .loc-badge { width: 28px; height: 28px; }
+      .detail-panel { width: min(318px, calc(100% - 14px)); }
+      .header-title { max-width: 300px; }
+      .header-meta { display: none; }
+    }
+
+    /* Los monitores bajos necesitan menos cabecera e imagen, no texto más pequeño. */
+    @media (min-width: 769px) and (max-height: 820px) {
+      .header { padding-top: 9px; }
+      .header-top { padding-bottom: 8px; }
+      .header-eyebrow { font-size: 9px; margin-bottom: 2px; }
+      .header-title { font-size: 17px; }
+      .eje-tab { padding-top: 8px; padding-bottom: 8px; }
+      .detail-panel { top: 7px; bottom: 7px; }
+      .detail-panel .detail-img-wrap,
+      .detail-panel .detail-img,
+      .detail-panel .detail-img-fallback { height: clamp(104px, 17vh, 144px); }
+      .detail-body { padding: 13px 15px 2px; }
+      .detail-eje-tag { margin-bottom: 7px; }
+      .detail-name { font-size: 18px; }
+      .detail-type { margin-bottom: 8px; }
+      .detail-desc { font-size: 13px; line-height: 1.5; }
+      .detail-footer { max-height: 48%; padding: 9px 15px 11px; }
+      .geo-result { padding: 9px 10px; margin-bottom: 8px; }
+      .btn-como-llegar { min-height: 40px; padding: 9px 12px; }
+      .btn-conectar { min-height: 39px; margin-top: 6px; padding: 8px 12px; }
+    }
+
+    @media (min-width: 769px) and (max-height: 640px) {
+      .header { padding-top: 6px; }
+      .header-top { padding-bottom: 5px; }
+      .header-eyebrow { display: none; }
+      .header-title { font-size: 15px; }
+      .eje-tab { padding: 7px 10px; font-size: 11px; }
+      .detail-panel .detail-img-wrap,
+      .detail-panel .detail-img,
+      .detail-panel .detail-img-fallback { height: 92px; }
+      .detail-body { padding: 10px 13px 1px; }
+      .detail-eje-tag { font-size: 9px; padding: 3px 8px; margin-bottom: 5px; }
+      .detail-name { font-size: 17px; }
+      .detail-type { font-size: 11px; margin-bottom: 6px; }
+      .detail-desc { font-size: 12.5px; line-height: 1.46; }
+      .detail-footer { max-height: 52%; padding: 8px 13px 10px; }
+      .geo-result { font-size: 11px; }
+    }
+
+    /* Móvil: hoja inferior con áreas independientes para imagen, texto y acciones. */
+    @media (max-width: 768px) {
+      .main > div { display: flex; }
+      .header { padding: 10px 12px 0; }
+      .header-top { align-items: flex-start; gap: 8px; padding-bottom: 9px; }
+      .header-title { max-width: none; font-size: 16px; line-height: 1.2; white-space: normal; }
+      .header-eyebrow { font-size: 8px; letter-spacing: .11em; }
+      .eje-tabs { gap: 3px; }
+      .eje-tab { padding: 8px 10px; font-size: 11px; }
+      .eje-tab-dot { width: 8px; height: 8px; }
+
+      .bottom-sheet { left: 7px; right: 7px; width: auto; max-height: min(88dvh, 720px); min-height: 0; }
+      .bottom-sheet.visible {
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr) auto;
+      }
+      .bs-img, .bs-img-fallback { height: clamp(106px, 20dvh, 162px); }
+      .bs-body {
+        min-height: 0;
+        padding: 14px 16px 2px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+        -webkit-overflow-scrolling: touch;
+      }
+      .bs-footer {
+        min-width: 0;
+        max-height: min(42dvh, 310px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 10px 16px max(16px, env(safe-area-inset-bottom));
+      }
+      .bs-name { font-size: 19px; line-height: 1.17; }
+      .bs-type { font-size: 11px; margin-bottom: 8px; }
+      .bs-desc { font-size: 13px; line-height: 1.52; overflow-wrap: anywhere; }
+      .bs-close { top: 14px; right: 12px; }
+      .bs-drag { margin-top: 8px; }
+      .route-mode-banner { top: 10px; left: 10px; right: 10px; transform: none; max-width: none; width: auto; justify-content: space-between; font-size: 12px; }
+      .route-banner-cancel { flex-shrink: 0; }
+    }
+
+    @media (max-width: 420px) {
+      .header-title { font-size: 15px; }
+      .eje-tab { padding: 7px 9px; font-size: 10px; }
+      .bottom-sheet { left: 4px; right: 4px; }
+      .bs-body { padding-left: 14px; padding-right: 14px; }
+      .bs-footer { padding-left: 14px; padding-right: 14px; }
+      .transport-cards { gap: 5px; }
+      .t-card { padding: 8px 3px; }
+      .t-card-label { font-size: 9px; }
+    }
+
+    @media (max-width: 768px) and (max-height: 680px) {
+      .bottom-sheet { max-height: 92dvh; }
+      .bs-img, .bs-img-fallback { height: 94px; }
+      .bs-body { padding-top: 10px; }
+      .bs-name { font-size: 17px; }
+      .bs-desc { font-size: 12px; line-height: 1.45; }
+      .bs-footer { max-height: 48dvh; padding-top: 8px; }
+      .btn-como-llegar { min-height: 40px; font-size: 13px; }
+      .btn-conectar { min-height: 39px; font-size: 12px; }
+    }
+
+  
+
+    /* ---- Corrección de acciones: el pie nunca debe convertirse en un panel con scroll ---- */
+    .detail-footer,
+    .bs-footer {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+      min-width: 0;
+      min-height: 0;
+      max-height: none !important;
+      overflow: visible !important;
+      scrollbar-gutter: auto;
+    }
+    .detail-footer .geo-result,
+    .bs-footer .geo-result {
+      margin: 0;
+    }
+    .detail-footer .btn-conectar,
+    .bs-footer .btn-conectar {
+      margin-top: 0;
+    }
+    .detail-footer .btn-como-llegar,
+    .detail-footer .btn-conectar,
+    .bs-footer .btn-como-llegar,
+    .bs-footer .btn-conectar {
+      min-width: 0;
+      white-space: normal;
+      text-align: center;
+    }
+
+    /* En escritorio, las acciones se conservan ancladas y limpias al final de la ficha.
+       El contenido descriptivo es la única zona que puede desplazarse. */
+    @media (min-width: 769px) {
+      .detail-panel.visible { grid-template-rows: auto minmax(0, 1fr) auto; }
+      .detail-footer {
+        padding: 11px 15px 13px;
+        border-top: 1px solid var(--border);
+        background: var(--white);
+        box-shadow: 0 -8px 18px rgba(25, 31, 22, .05);
+      }
+      .detail-body { padding-bottom: 14px; }
+    }
+
+    /* En alturas muy reducidas se compactan los botones, pero no se fuerza un scroll interno. */
+    @media (min-width: 769px) and (max-height: 640px) {
+      .detail-footer { gap: 6px; padding: 8px 12px 10px; }
+      .detail-footer .btn-como-llegar { min-height: 38px; padding: 8px 10px; font-size: 12px; }
+      .detail-footer .btn-conectar { min-height: 37px; padding: 8px 10px; font-size: 12px; }
+      .detail-footer .geo-result { font-size: 10.5px; padding: 8px 9px; }
+    }
+
+    @media (max-width: 768px) {
+      .bs-footer {
+        padding: 10px 16px max(16px, env(safe-area-inset-bottom));
+        background: var(--white);
+        box-shadow: 0 -8px 18px rgba(25, 31, 22, .05);
+      }
+      .bs-body { padding-bottom: 14px; }
+    }
+
+    /* Valla de enfoque: puntos redondos en el color de cada ruta. */
+    .focus-boundary-fence {
+      stroke-linecap: round !important;
+      stroke-linejoin: round !important;
+    }
+
+</style>
+</head>
+<body class="single-eje single-eje-4">
+
+<header class="header">
+  <div class="header-top">
+    <div>
+      <div class="header-eyebrow">Cali Ciudad Diversa — Mapa Turístico</div>
+      <div class="header-title" id="headerTitle">Explorando Cali</div>
+    </div>
+    <div class="header-meta">
+      <div class="meta-chip"><span class="meta-chip-label">Lugares</span><span class="meta-chip-value">4</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="main">
+  <aside class="sidebar" aria-label="Lista de lugares">
+    <div class="sidebar-header">
+      <div class="sidebar-badge" id="sidebarBadge"></div>
+      <div class="sidebar-title" id="sidebarTitle"></div>
+      <div class="sidebar-hint">Selecciona un lugar para explorarlo en el mapa.</div>
+    </div>
+    <div class="loc-list" id="locList" role="list"></div>
+  </aside>
+
+  <div style="flex:1;position:relative;overflow:hidden;">
+    <div class="map-loading" id="mapLoading" aria-live="polite">
+      <div class="spinner"></div>
+      <div class="loading-text">Cargando mapa…</div>
+    </div>
+
+    <div id="map" style="width:100%;height:100%;" role="application" aria-label="Mapa interactivo de Cali"></div>
+
+    <div class="route-mode-banner" id="routeModeBanner" role="status" aria-live="polite">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      <span id="routeBannerText">Selecciona el destino en el mapa</span>
+      <button class="route-banner-cancel" id="routeBannerCancel">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"/></svg>
+        <span>Cancelar</span>
+      </button>
+    </div>
+
+    <aside class="detail-panel" id="detailPanel" aria-label="Información del lugar">
+      <button class="detail-close" id="detailClose" aria-label="Cerrar panel">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <line x1="1" y1="1" x2="9" y2="9"/><line x1="9" y1="1" x2="1" y2="9"/>
+        </svg>
+      </button>
+      <div class="detail-img-wrap">
+        <img  class="detail-img"         id="detailImg"         alt="" />
+        <div  class="detail-img-fallback" id="detailImgFallback">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span id="detailImgFallbackText">Imagen no disponible</span>
+        </div>
+      </div>
+      <div class="detail-body">
+        <div class="detail-eje-tag" id="detailEjeTag"></div>
+        <div class="detail-name"    id="detailName"></div>
+        <div class="detail-type"    id="detailType"></div>
+        <div class="detail-desc"    id="detailDesc"></div>
+        <div class="no-coords-badge" id="detailNoCoordsWarn" style="display:none;" aria-live="polite">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.6 2.8 16.4A2 2 0 0 0 4.5 19.4h15a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 16.5h.01"/></svg>
+          <span>Coordenadas pendientes de verificar</span>
+        </div>
+      </div>
+      <div class="detail-footer">
+        <div class="geo-result" id="geoResult" style="display:none;" aria-live="polite"></div>
+        <button class="btn-como-llegar" id="btnComoLlegar">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
+          Calcular ruta desde mi posición
+        </button>
+        <button class="btn-conectar" id="btnConectar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Conectar con otro lugar
+        </button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="bottom-sheet" id="bottomSheet" role="dialog" aria-modal="true" aria-label="Información del lugar">
+  <div class="bs-drag" aria-hidden="true"></div>
+  <button class="bs-close" id="bsClose" aria-label="Cerrar">
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+      <line x1="1" y1="1" x2="9" y2="9"/><line x1="9" y1="1" x2="1" y2="9"/>
+    </svg>
+  </button>
+  <img  class="bs-img"         id="bsImg"         alt="" />
+  <div  class="bs-img-fallback" id="bsImgFallback">Imagen no disponible</div>
+  <div class="bs-body">
+    <div class="detail-eje-tag" id="bsEjeTag" style="margin-bottom:7px;"></div>
+    <div class="bs-name" id="bsName"></div>
+    <div class="bs-type" id="bsType"></div>
+    <div class="bs-desc" id="bsDesc"></div>
+    <div class="no-coords-badge" id="bsNoCoordsWarn" style="display:none;" aria-live="polite">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.6 2.8 16.4A2 2 0 0 0 4.5 19.4h15a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 16.5h.01"/></svg>
+      <span>Coordenadas pendientes</span>
+    </div>
+  </div>
+  <div class="bs-footer">
+    <div class="geo-result" id="bsGeoResult" style="display:none;" aria-live="polite"></div>
+    <button class="btn-como-llegar" id="bsBtnComoLlegar">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
+      Calcular ruta desde mi posición
+    </button>
+    <button class="btn-conectar" id="bsBtnConectar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      Conectar con otro lugar
+    </button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+/* =================================================================
+   DATA — fuente central de ejes y lugares turísticos de Cali.
+   coords: [lat, lng] WGS-84
+   coordsStatus: 'verified' | 'approximate' | 'pending'
+   tipo: 'lugar' | 'mural' | 'ruta' | 'sector'
+   canEvolveToRoute: indica puntos del Eje 3 que podrán
+     convertirse en ruta interna en el futuro.
+================================================================= */
+const EJES = [
+{
+    id: 4, nombre: 'Turismo Histórico y Memoria', nombreCorto: 'Historia',
+    color: '#C53264', colorPale: '#F2CCDA',
+    lugares: [
+      { id:'e4-1', nombre:'Complejo Religioso La Merced',
+        descripcion:'Considerado el espacio fundacional de Cali, el Complejo La Merced fue el primer asentamiento de la ciudad colonial. Su arquitectura conserva elementos de los siglos XVI y XVII, e incluye la Iglesia La Merced y el Museo de Arte Colonial y Religioso, guardián de la memoria espiritual caleña.',
+        imagen:'Muestra mapas interactivos/Imagenes/Eje4/Merced.jpg', coords:[3.4503,-76.5330], coordsStatus:'verified', tipo:'lugar' },
+      { id:'e4-2', nombre:'Iglesia La Ermita',
+        descripcion:'Ícono visual de Cali por excelencia, la Iglesia La Ermita domina la ribera del río con su arquitectura neogótica de torres blancas. Construida entre 1930 y 1942, es uno de los monumentos religiosos más fotografiados de Colombia y un símbolo inequívoco de la identidad urbana de la ciudad.',
+        imagen:'Muestra mapas interactivos/Imagenes/Eje4/La ermita.jpg', coords:[3.4494,-76.5351], coordsStatus:'verified', tipo:'lugar' },
+      { id:'e4-3', nombre:'Teatro Municipal Enrique Buenaventura',
+        descripcion:'Joya de la arquitectura republicana del siglo XX y sede del patrimonio artístico escénico de Cali. El Teatro Municipal lleva el nombre del dramaturgo Enrique Buenaventura, renovador del teatro latinoamericano. Su fachada histórica y su programación lo posicionan como corazón cultural del centro.',
+        imagen:'Muestra mapas interactivos/Imagenes/Eje4/Municipal.jpg', coords:[3.4503,-76.5335], coordsStatus:'verified', tipo:'lugar' },
+      { id:'e4-4', nombre:'Plaza de Cayzedo',
+        descripcion:'Corazón histórico, social y comercial de Cali desde la época colonial. La Plaza de Cayzedo, enmarcada por la Catedral Metropolitana y edificios republicanos, es el punto de convergencia de la vida ciudadana. Homenajea a Joaquín de Cayzedo y Cuero, prócer de la Independencia caleña.',
+        imagen:'Muestra mapas interactivos/Imagenes/Eje4/Plaza de caycedo.webp', coords:[3.4501,-76.5317], coordsStatus:'verified', tipo:'lugar' }
+    ]
+  }
+];
+
+/* ---- Haversine distance (km) ---- */
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+/* ---- State ---- */
+let activeEjeId = 4, selectedLugarId = null;
+let userMarker = null, userAccuracyCircle = null, userRouteLine = null;
+let ejePolylines = [], ejeMarkers = [];
+let ejeBoundaryCircle = null, ejeBoundaryHalo = null, ejeMaxBounds = null;
+let routeMode = false, routeOriginId = null, routeOriginPrefix = null;
+let interPoiRouteLine = null;
+
+/* ---- Map ---- */
+const map = L.map('map', {
+  center:[3.4200,-76.5400], zoom:13, preferCanvas:true,
+  maxBoundsViscosity: 1.0, minZoom: 11, maxZoom: 18, zoomSnap: 0.25, worldCopyJump: false
+});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  subdomains:'abcd', maxZoom:20
+}).addTo(map);
+// Sin capa oscura sobre la cartografía: el mapa se mantiene claro dentro del embed.
+map.whenReady(() => document.getElementById('mapLoading').classList.add('hidden'));
+setTimeout(() => document.getElementById('mapLoading').classList.add('hidden'), 2500);
+// Refuerza el límite ante arrastre, rueda de zoom, pinch o controles +/−.
+map.on('dragend zoomend', clampMapToFocusArea);
+
+/* ---- Marker icon factory ---- */
+function makeMarkerIcon(index, color, isSelected) {
+  const size = isSelected ? 36 : 30, half = size / 2;
+  const ring = isSelected
+    ? `0 0 0 3px #fff, 0 0 0 5.5px ${color}, 0 3px 12px rgba(0,0,0,.28)`
+    : '0 2px 8px rgba(0,0,0,.22)';
+  return L.divIcon({
+    className:'',
+    html:`<div style="width:${size}px;height:${size}px;background:${color};border:2.5px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${isSelected?13:11}px;font-weight:700;color:#fff;font-family:'Inter',system-ui,sans-serif;box-shadow:${ring};cursor:pointer;">${index+1}</div>`,
+    iconSize:[size,size], iconAnchor:[half,half]
+  });
+}
+
+function applyEjeColors(eje) {
+  document.documentElement.style.setProperty('--active',      eje.color);
+  document.documentElement.style.setProperty('--active-pale', eje.colorPale);
+}
+
+function getActiveEje() { return EJES.find(e => e.id === activeEjeId); }
+
+/* ---- Área visible del eje: valla circular y límites reales de navegación ---- */
+function clampMapToFocusArea() {
+  if (!ejeMaxBounds) return;
+  map.panInsideBounds(ejeMaxBounds, { animate: false });
+}
+
+function configureEjeFocusArea(validLugares, eje) {
+  [ejeBoundaryHalo, ejeBoundaryCircle].forEach(layer => {
+    if (layer) map.removeLayer(layer);
+  });
+  ejeBoundaryHalo = null;
+  ejeBoundaryCircle = null;
+  ejeMaxBounds = null;
+  map.setMaxBounds(null);
+  map.setMinZoom(11);
+
+  if (!validLugares.length) return;
+
+  const pointBounds = L.latLngBounds(validLugares.map(l => l.coords));
+  const center = pointBounds.getCenter();
+  const farthestPointMeters = Math.max(...validLugares.map(l =>
+    center.distanceTo(L.latLng(l.coords))
+  ));
+
+  // Margen suficiente para que los marcadores, su borde y sus tooltips queden dentro.
+  const radiusMeters = Math.max(520, (farthestPointMeters * 1.20) + 80);
+
+  // Valla visible: un único círculo de puntos con el color de la Ruta.
+  // No se usa halo blanco para que el color institucional se lea sobre la cartografía.
+  ejeBoundaryCircle = L.circle(center, {
+    radius: radiusMeters,
+    color: eje.color,
+    weight: 5,
+    opacity: 1,
+    dashArray: '2 12',
+    lineCap: 'round',
+    lineJoin: 'round',
+    fillColor: eje.colorPale,
+    fillOpacity: 0.06,
+    interactive: false,
+    className: 'focus-boundary-fence'
+  }).addTo(map);
+
+  ejeBoundaryCircle.bringToBack();
+
+  // La navegación queda encerrada por una caja sólo 6% más grande que la valla.
+  // Con maxBoundsViscosity: 1, no se puede arrastrar fuera de este límite.
+  ejeMaxBounds = ejeBoundaryCircle.getBounds().pad(0.06);
+  map.setMaxBounds(ejeMaxBounds);
+
+  requestAnimationFrame(() => {
+    map.invalidateSize();
+    const minimumAllowedZoom = map.getBoundsZoom(ejeMaxBounds, false);
+    map.setMinZoom(Math.max(11, Math.min(16, minimumAllowedZoom)));
+    map.fitBounds(ejeMaxBounds, { maxZoom: 16, animate: false });
+    clampMapToFocusArea();
+  });
+}
+
+/* ---- Render eje ---- */
+function renderEje(ejeId) {
+  activeEjeId = ejeId; selectedLugarId = null;
+  const eje = getActiveEje();
+  applyEjeColors(eje);
+
+  document.getElementById('headerTitle').textContent = eje.nombre;
+
+  const badge = document.getElementById('sidebarBadge');
+  badge.style.background = eje.colorPale; badge.style.color = eje.color;
+  badge.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${eje.color};display:inline-block;"></span> Ruta ${eje.id}`;
+  document.getElementById('sidebarTitle').textContent = eje.nombre;
+
+  document.querySelectorAll('.eje-tab').forEach(t =>
+    t.classList.toggle('active', parseInt(t.dataset.ejeId) === ejeId));
+
+  ejeMarkers.forEach(({ marker }) => map.removeLayer(marker)); ejeMarkers = [];
+  ejePolylines.forEach(l => map.removeLayer(l)); ejePolylines = [];
+  exitRouteMode(); clearGeoState(); closePanels(false);
+
+  const valid = eje.lugares.filter(l => l.coords);
+  if (valid.length > 1) {
+    for (let i = 0; i < valid.length; i++)
+      for (let j = i+1; j < valid.length; j++)
+        ejePolylines.push(L.polyline([valid[i].coords, valid[j].coords],
+          { color:eje.color, weight:1.4, opacity:0.28, dashArray:'5 7', interactive:false }).addTo(map));
+  }
+
+  eje.lugares.forEach((lugar, i) => {
+    if (!lugar.coords) return;
+    const marker = L.marker(lugar.coords, { icon: makeMarkerIcon(i, eje.color, false) }).addTo(map);
+    marker.bindTooltip(lugar.nombre, { permanent:false, direction:'top', offset:[0,-8], className:'map-tooltip' });
+    marker.on('click', () => selectLugar(lugar.id));
+    ejeMarkers.push({ marker, lugarId: lugar.id });
+  });
+
+  // La valla se configura después de crear los marcadores, para que encierre el conjunto completo.
+  configureEjeFocusArea(valid, eje);
+  renderSidebarList(eje);
+}
+
+function renderSidebarList(eje) {
+  const list = document.getElementById('locList');
+  list.innerHTML = '';
+  eje.lugares.forEach((lugar, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'loc-item'; btn.dataset.lid = lugar.id;
+    btn.setAttribute('role','listitem'); btn.setAttribute('aria-label', lugar.nombre);
+    const thumb = lugar.imagen
+      ? `<img class="loc-thumb" src="${lugar.imagen}" alt="" loading="lazy" onerror="this.style.display='none'">`
+      : `<div class="loc-thumb-empty" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div>`;
+    btn.innerHTML = `
+      <div class="loc-badge" style="background:${eje.color};">${i+1}</div>${thumb}
+      <div class="loc-text">
+        <div class="loc-name">${lugar.nombre}</div>
+        <div class="loc-type">${lugar.tipo}${lugar.coordsStatus==='pending'?' · coordenadas pendientes':''}</div>
+      </div>`;
+    btn.addEventListener('click', () => selectLugar(lugar.id));
+    list.appendChild(btn);
+  });
+}
+
+/* ---- Select lugar ---- */
+function selectLugar(lugarId) {
+  if (routeMode) {
+    if (lugarId !== routeOriginId) { selectRouteDestination(lugarId); return; }
+    exitRouteMode(); return;
+  }
+  const eje = getActiveEje();
+  const idx = eje.lugares.findIndex(l => l.id === lugarId);
+  if (idx === -1) return;
+  const lugar = eje.lugares[idx];
+  selectedLugarId = lugarId;
+
+  document.querySelectorAll('.loc-item').forEach((el, i) => el.classList.toggle('active', i === idx));
+
+  ejeMarkers.forEach(({ marker, lugarId: mid }) => {
+    const mIdx = eje.lugares.findIndex(l => l.id === mid);
+    marker.setIcon(makeMarkerIcon(mIdx, eje.color, mid === lugarId));
+    if (mid === lugarId && lugar.coords) marker.openTooltip();
+  });
+
+  if (lugar.coords) {
+    map.setView(lugar.coords, Math.max(map.getZoom(), 15), { animate:true });
+    requestAnimationFrame(clampMapToFocusArea);
+  }
+
+  clearGeoState();
+
+  if (window.innerWidth <= 768) {
+    fillPanel(eje, lugar, 'bs');
+    document.getElementById('bottomSheet').classList.add('visible');
+  } else {
+    fillPanel(eje, lugar, 'detail');
+    document.getElementById('detailPanel').classList.add('visible');
+  }
+}
+
+/* ---- Fill panel ---- */
+function iconPin() {
+  return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>`;
+}
+function iconWarning() {
+  return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.6 2.8 16.4A2 2 0 0 0 4.5 19.4h15a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 16.5h.01"/></svg>`;
+}
+function iconCar() {
+  return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 11 1.7-4.1A2 2 0 0 1 8.5 5.7h7a2 2 0 0 1 1.8 1.2L19 11"/><path d="M4.5 11h15a1.5 1.5 0 0 1 1.5 1.5v4A1.5 1.5 0 0 1 19.5 18h-15A1.5 1.5 0 0 1 3 16.5v-4A1.5 1.5 0 0 1 4.5 11Z"/><path d="M7 18v1.5M17 18v1.5M7 14h.01M17 14h.01"/></svg>`;
+}
+function iconBike() {
+  return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="m5.5 17.5 4-8h3l3 8M11 13.5h5.5M9 9.5 7.5 7H5M12.5 6.5h2"/></svg>`;
+}
+function iconWalk() {
+  return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="13.5" cy="4.5" r="2"/><path d="m10 21 1.5-6-2-3 2-3 2.5 2 3 .5M12 9l-1.5 3.5M14 14l3 7"/></svg>`;
+}
+function iconSpinner() {
+  return `<span style="width:13px;height:13px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .7s linear infinite;"></span>`;
+}
+
+function fillPanel(eje, lugar, prefix) {
+  const d = prefix === 'detail';
+  const img      = document.getElementById(d ? 'detailImg'         : 'bsImg');
+  const fallback = document.getElementById(d ? 'detailImgFallback' : 'bsImgFallback');
+
+  if (lugar.imagen) {
+    img.src = lugar.imagen; img.alt = lugar.nombre; img.style.display = 'block';
+    img.onerror = () => { img.style.display = 'none'; fallback.style.display = 'flex'; };
+    fallback.style.display = 'none';
+  } else {
+    img.style.display = 'none'; fallback.style.display = 'flex';
+    const msg = 'Imagen no disponible';
+    if (d) document.getElementById('detailImgFallbackText').textContent = msg;
+    else   fallback.textContent = msg;
+  }
+
+  const tag = document.getElementById(d ? 'detailEjeTag' : 'bsEjeTag');
+  tag.style.background = eje.colorPale; tag.style.color = eje.color;
+  tag.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:${eje.color};display:inline-block;"></span> ${eje.nombreCorto}`;
+
+  document.getElementById(d ? 'detailName' : 'bsName').textContent = lugar.nombre;
+  document.getElementById(d ? 'detailType' : 'bsType').textContent =
+    lugar.tipo + (lugar.canEvolveToRoute ? ' · puede evolucionar a ruta' : '');
+  document.getElementById(d ? 'detailDesc' : 'bsDesc').textContent = lugar.descripcion;
+  document.getElementById(d ? 'detailNoCoordsWarn' : 'bsNoCoordsWarn').style.display =
+    lugar.coordsStatus === 'pending' ? 'inline-flex' : 'none';
+
+  const btn = document.getElementById(d ? 'btnComoLlegar' : 'bsBtnComoLlegar');
+  btn.style.background = eje.color; btn.style.color = '#fff';
+  btn.disabled = false; btn.innerHTML = iconPin() + ' Calcular ruta desde mi posición';
+  btn.onclick = () => handleComoLlegar(lugar, prefix);
+
+  const btnC = document.getElementById(d ? 'btnConectar' : 'bsBtnConectar');
+  btnC.classList.remove('route-active');
+  btnC.onclick = () => enterRouteMode(lugar.id, prefix);
+}
+
+/* ---- Geo state helpers ---- */
+function clearGeoState() {
+  if (userMarker)        { map.removeLayer(userMarker);        userMarker        = null; }
+  if (userAccuracyCircle){ map.removeLayer(userAccuracyCircle); userAccuracyCircle = null; }
+  if (userRouteLine)     { map.removeLayer(userRouteLine);     userRouteLine     = null; }
+  if (interPoiRouteLine) { map.removeLayer(interPoiRouteLine); interPoiRouteLine = null; }
+  ['geoResult','bsGeoResult'].forEach(id => {
+    const el = document.getElementById(id);
+    el.style.display = 'none'; el.className = 'geo-result'; el.innerHTML = '';
+  });
+  ['btnComoLlegar','bsBtnComoLlegar'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) { btn.disabled = false; btn.innerHTML = iconPin() + ' Calcular ruta desde mi posición'; }
+  });
+}
+
+function setGeoStatus(prefix, type, html) {
+  const el = document.getElementById(prefix === 'bs' ? 'bsGeoResult' : 'geoResult');
+  el.className = `geo-result ${type}`; el.innerHTML = html; el.style.display = 'block';
+}
+
+/* ---- Cómo llegar ---- */
+function isTrustedLocationContext() {
+  const localHosts = ['localhost', '127.0.0.1', '[::1]'];
+  return window.isSecureContext || localHosts.includes(window.location.hostname);
+}
+
+function getActionButton(prefix) {
+  return document.getElementById(prefix === 'bs' ? 'bsBtnComoLlegar' : 'btnComoLlegar');
+}
+
+function updateLocationButton(prefix, label, disabled = false) {
+  const btn = getActionButton(prefix);
+  if (!btn) return;
+  btn.disabled = disabled;
+  btn.innerHTML = disabled ? iconSpinner() + ' ' + label : iconPin() + ' ' + label;
+}
+
+async function getGeolocationPermissionState() {
+  if (!navigator.permissions?.query) return 'unknown';
+  try {
+    const result = await navigator.permissions.query({ name: 'geolocation' });
+    return result.state || 'unknown';
+  } catch (_) {
+    return 'unknown';
+  }
+}
+
+function locationEnvironmentNote() {
+  if (window.matchMedia?.('(display-mode: standalone)').matches) return '';
+  const inDeviceToolbar = window.visualViewport && window.visualViewport.scale !== 1;
+  return inDeviceToolbar
+    ? ' Estás probando con emulación de dispositivo: configura una ubicación en DevTools > Sensors o verifica también desde un teléfono real.'
+    : '';
+}
+
+async function handleComoLlegar(lugar, prefix) {
+  if (!lugar.coords) {
+    setGeoStatus(prefix, 'error', `<div class="geo-row">${iconWarning()}<span>Este lugar no tiene coordenadas confirmadas. No se puede calcular la ruta.</span></div>`);
+    return;
+  }
+  if (!('geolocation' in navigator)) {
+    setGeoStatus(prefix, 'error', `<div class="geo-row">${iconWarning()}<span>Tu navegador no permite usar la ubicación.</span></div>`);
+    return;
+  }
+  if (!isTrustedLocationContext()) {
+    setGeoStatus(prefix, 'error', `<div class="geo-row">${iconWarning()}<span>La ubicación requiere abrir el sitio desde HTTPS o desde localhost. En GitHub Pages funcionará normalmente.</span></div>`);
+    return;
+  }
+
+  updateLocationButton(prefix, 'Revisando ubicación…', true);
+  const permission = await getGeolocationPermissionState();
+  if (permission === 'denied') {
+    updateLocationButton(prefix, 'Intentar nuevamente');
+    setGeoStatus(prefix, 'error', `<div class="geo-row">${iconWarning()}<span>Chrome tiene bloqueada la ubicación para este sitio. Haz clic en el icono de controles junto a la URL, cambia “Ubicación” a “Permitir” y recarga la página.</span></div>`);
+    return;
+  }
+
+  setGeoStatus(prefix, 'loading', `<div class="geo-row">${iconPin()}<span>${permission === 'granted' ? 'Ubicación autorizada. Buscando una posición actual…' : 'Permite el acceso a tu ubicación para calcular la ruta.'}</span></div><div class="geo-diagnostic">${locationEnvironmentNote()}</div>`);
+  requestUserLocation(lugar, prefix, true);
+}
+
+function requestUserLocation(lugar, prefix, highAccuracy) {
+  navigator.geolocation.getCurrentPosition(
+    pos => onGeoSuccess(pos, lugar, prefix),
+    err => {
+      // Algunos equipos no entregan GPS preciso en interiores. Se intenta una ubicación aproximada antes de fallar.
+      if (highAccuracy && err.code !== 1) {
+        setGeoStatus(prefix, 'loading', `<div class="geo-row">${iconPin()}<span>No llegó una ubicación GPS precisa. Buscando una ubicación aproximada…</span></div>`);
+        requestUserLocation(lugar, prefix, false);
+        return;
+      }
+      onGeoError(err, lugar, prefix);
+    },
+    { enableHighAccuracy: highAccuracy, timeout: highAccuracy ? 22000 : 15000, maximumAge: highAccuracy ? 0 : 60000 }
+  );
+}
+
+function onGeoSuccess(pos, lugar, prefix) {
+  const uLat = pos.coords.latitude, uLng = pos.coords.longitude;
+  const accuracy = Math.max(1, Math.round(pos.coords.accuracy || 0));
+
+  if (userMarker) map.removeLayer(userMarker);
+  userMarker = L.marker([uLat, uLng], {
+    icon: L.divIcon({ className:'', html:'<div class="user-dot"></div>', iconSize:[16,16], iconAnchor:[8,8] }),
+    zIndexOffset:1000
+  }).bindTooltip('Tu ubicación', { permanent:false, direction:'top', offset:[0,-6], className:'map-tooltip' }).addTo(map);
+
+  if (userAccuracyCircle) map.removeLayer(userAccuracyCircle);
+  userAccuracyCircle = L.circle([uLat, uLng], {
+    radius: accuracy, color:'#1f1f1f', weight:1, opacity:.35, fillColor:'#ffffff', fillOpacity:.12, interactive:false
+  }).addTo(map);
+
+  if (userRouteLine) map.removeLayer(userRouteLine);
+  userRouteLine = L.polyline([[uLat, uLng], lugar.coords], { color:'#1f1f1f', weight:2.5, opacity:0.45, dashArray:'7 6' }).addTo(map);
+  map.fitBounds(L.latLngBounds([[uLat,uLng], lugar.coords]).pad(0.16), { maxZoom:16, animate:true });
+
+  updateLocationButton(prefix, 'Actualizar ubicación');
+  getActionButton(prefix).onclick = () => handleComoLlegar(lugar, prefix);
+  setGeoStatus(prefix, 'loading', `<div class="geo-row">${iconPin()}<span>Ubicación encontrada. Trazando la ruta hacia <strong>${lugar.nombre}</strong>…</span></div>`);
+
+  fetchUserRoute(uLat, uLng, lugar.coords[0], lugar.coords[1], lugar.nombre, prefix, accuracy);
+}
+
+const ROUTING_SERVICES = [
+  'https://router.project-osrm.org/route/v1/driving',
+  'https://routing.openstreetmap.de/routed-car/route/v1/driving'
+];
+
+async function requestDrivingRoute(fromLat, fromLng, toLat, toLng) {
+  let lastError = new Error('No se recibió una ruta válida.');
+  for (const endpoint of ROUTING_SERVICES) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    try {
+      const url = `${endpoint}/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson&steps=false`;
+      const response = await fetch(url, { signal: controller.signal, headers:{ Accept:'application/json' } });
+      if (!response.ok) throw new Error(`Servicio de rutas no disponible (${response.status}).`);
+      const data = await response.json();
+      const route = data?.routes?.[0];
+      if (data.code !== 'Ok' || !route?.geometry?.coordinates?.length) throw new Error('Respuesta de ruta incompleta.');
+      return route;
+    } catch (error) {
+      lastError = error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw lastError;
+}
+
+function routeMetrics(route) {
+  const km = (route.distance / 1000).toFixed(1);
+  const minCar = Math.max(1, Math.round(route.duration / 60));
+  const minBike = Math.max(1, Math.round((route.distance / 1000 / 14) * 60));
+  const minWalk = Math.max(1, Math.round((route.distance / 1000 / 4.5) * 60));
+  return { km, minCar, minBike, minWalk };
+}
+
+function fallbackMetrics(fromLat, fromLng, toLat, toLng) {
+  const distance = haversine(fromLat, fromLng, toLat, toLng);
+  return {
+    km: distance.toFixed(1),
+    minCar: Math.max(1, Math.round((distance / 25) * 60)),
+    minBike: Math.max(1, Math.round((distance / 14) * 60)),
+    minWalk: Math.max(1, Math.round((distance / 4.5) * 60))
+  };
+}
+
+async function fetchUserRoute(fromLat, fromLng, toLat, toLng, destName, prefix, accuracy) {
+  try {
+    const route = await requestDrivingRoute(fromLat, fromLng, toLat, toLng);
+    const coords = route.geometry.coordinates.map(([lng,lat]) => [lat,lng]);
+    if (userRouteLine) map.removeLayer(userRouteLine);
+    userRouteLine = L.polyline(coords, { color:'#1f1f1f', weight:4, opacity:.92 }).addTo(map);
+    const metrics = routeMetrics(route);
+    setGeoStatus(prefix, 'success', buildTransportHtml('Tu ubicación', destName, metrics.km, metrics.minCar, metrics.minBike, metrics.minWalk, false, accuracy));
+  } catch (_) {
+    const metrics = fallbackMetrics(fromLat, fromLng, toLat, toLng);
+    setGeoStatus(prefix, 'success', buildTransportHtml('Tu ubicación', destName, metrics.km, metrics.minCar, metrics.minBike, metrics.minWalk, true, accuracy));
+  }
+}
+
+function onGeoError(err, lugar, prefix) {
+  updateLocationButton(prefix, 'Intentar nuevamente');
+  getActionButton(prefix).onclick = () => handleComoLlegar(lugar, prefix);
+  const msgs = {
+    1: 'Permiso denegado. Habilita la ubicación para este sitio en los ajustes del navegador e intenta nuevamente.',
+    2: 'Chrome tiene permiso, pero el equipo no entregó una coordenada. Activa “Servicios de ubicación” en Windows o configura una ubicación de prueba en DevTools > Sensors.',
+    3: 'La solicitud tardó demasiado. Intenta nuevamente desde un lugar con mejor señal o usa una ubicación de prueba en DevTools > Sensors.'
+  };
+  const extra = err?.message ? `<div class="geo-diagnostic">Detalle técnico: ${err.message}</div>` : '';
+  setGeoStatus(prefix, 'error', `<div class="geo-row">${iconWarning()}<span>${msgs[err.code] || 'Error al obtener la ubicación.'}</span></div>${extra}`);
+}
+/* ---- Close panels ---- */
+function closePanels(resetMarkers) {
+  document.getElementById('detailPanel').classList.remove('visible');
+  document.getElementById('bottomSheet').classList.remove('visible');
+  selectedLugarId = null;
+  if (routeMode) exitRouteMode(false);
+  if (resetMarkers) {
+    const eje = getActiveEje();
+    ejeMarkers.forEach(({ marker, lugarId }) => {
+      const idx = eje.lugares.findIndex(l => l.id === lugarId);
+      marker.setIcon(makeMarkerIcon(idx, eje.color, false));
+    });
+    document.querySelectorAll('.loc-item').forEach(el => el.classList.remove('active'));
+    clearGeoState();
+  }
+}
+
+/* ---- Transport HTML builder ---- */
+function buildTransportHtml(fromLabel, toLabel, km, minCar, minBike, minWalk, isEstimate = false, accuracy = null) {
+  const accuracyText = accuracy ? `<span>Precisión aproximada de tu ubicación: ${accuracy} m.</span>` : '';
+  return `
+    <div style="font-size:12px;font-weight:700;margin-bottom:7px;display:flex;align-items:center;gap:7px;">${iconPin()} <span>De <strong>${fromLabel}</strong> a <strong>${toLabel}</strong></span></div>
+    <div class="transport-cards">
+      <div class="t-card highlight"><div class="t-card-icon">${iconCar()}</div><div class="t-card-val">~${minCar} min</div><div class="t-card-label">${km} km<br>en carro</div></div>
+      <div class="t-card"><div class="t-card-icon">${iconBike()}</div><div class="t-card-val">~${minBike} min</div><div class="t-card-label">en bicicleta</div></div>
+      <div class="t-card"><div class="t-card-icon">${iconWalk()}</div><div class="t-card-val">~${minWalk} min</div><div class="t-card-label">caminando</div></div>
+    </div>
+    ${isEstimate || accuracyText ? `<div class="geo-note">${isEstimate ? iconWarning() + '<span>Ruta detallada no disponible; estos tiempos son una estimación.</span>' : ''}${accuracyText}</div>` : ''}
+  `;
+}
+/* ---- Route mode: connect two POIs ---- */
+function enterRouteMode(originId, prefix) {
+  routeMode = true; routeOriginId = originId; routeOriginPrefix = prefix;
+  const eje    = getActiveEje();
+  const origin = eje.lugares.find(l => l.id === originId);
+  document.getElementById('routeBannerText').textContent =
+    'Origen: "' + origin.nombre + '" — selecciona el lugar de destino en el mapa';
+  document.getElementById('routeModeBanner').classList.add('visible');
+  const panelId = prefix === 'bs' ? 'bottomSheet' : 'detailPanel';
+  document.getElementById(panelId).classList.remove('visible');
+  const btnC = document.getElementById(prefix === 'bs' ? 'bsBtnConectar' : 'btnConectar');
+  if (btnC) btnC.classList.add('route-active');
+}
+
+function exitRouteMode(reopenOrigin = true) {
+  if (!routeMode) return;
+  const eje = getActiveEje();
+  const originId = routeOriginId;
+  const originPrefix = routeOriginPrefix || (window.innerWidth <= 768 ? 'bs' : 'detail');
+  routeMode = false; routeOriginId = null; routeOriginPrefix = null;
+  document.getElementById('routeModeBanner').classList.remove('visible');
+  ['btnConectar','bsBtnConectar'].forEach(id => {
+    const b = document.getElementById(id); if (b) b.classList.remove('route-active');
+  });
+  if (reopenOrigin && originId) {
+    const origin = eje.lugares.find(l => l.id === originId);
+    if (origin) {
+      fillPanel(eje, origin, originPrefix);
+      document.getElementById(originPrefix === 'bs' ? 'bottomSheet' : 'detailPanel').classList.add('visible');
+    }
+  }
+}
+
+function selectRouteDestination(destId) {
+  const eje    = getActiveEje();
+  const origin = eje.lugares.find(l => l.id === routeOriginId);
+  const dest   = eje.lugares.find(l => l.id === destId);
+  if (!origin || !dest) { exitRouteMode(false); return; }
+  exitRouteMode(false);
+  const prefix = window.innerWidth <= 768 ? 'bs' : 'detail';
+  if (!origin.coords || !dest.coords) {
+    selectLugar(destId);
+    setGeoStatus(prefix, 'error', `<div class="geo-row">${iconWarning()}<span>Uno de los lugares no tiene coordenadas confirmadas.</span></div>`);
+    return;
+  }
+  clearGeoState();
+  map.fitBounds(L.latLngBounds([origin.coords, dest.coords]).pad(0.16), { maxZoom: 16, animate: true });
+  selectedLugarId = destId;
+  const destIdx = eje.lugares.findIndex(l => l.id === destId);
+  document.querySelectorAll('.loc-item').forEach((el, i) => el.classList.toggle('active', i === destIdx));
+  ejeMarkers.forEach(({ marker, lugarId: mid }) => {
+    const mIdx = eje.lugares.findIndex(l => l.id === mid);
+    marker.setIcon(makeMarkerIcon(mIdx, eje.color, mid === destId));
+  });
+  fillPanel(eje, dest, prefix);
+  document.getElementById(prefix === 'bs' ? 'bottomSheet' : 'detailPanel').classList.add('visible');
+  setGeoStatus(prefix, 'loading',
+    `<div class="geo-row">${iconPin()}<span>Trazando la ruta de <strong>${origin.nombre}</strong> a <strong>${dest.nombre}</strong>…</span></div>`);
+  fetchInterPoiRoute(origin, dest, prefix);
+}
+
+function fetchInterPoiRoute(origin, dest, prefix) {
+  const eje = getActiveEje();
+  requestDrivingRoute(origin.coords[0], origin.coords[1], dest.coords[0], dest.coords[1])
+    .then(route => {
+      const coords = route.geometry.coordinates.map(([lng,lat]) => [lat,lng]);
+      if (interPoiRouteLine) map.removeLayer(interPoiRouteLine);
+      interPoiRouteLine = L.polyline(coords, { color:eje.color, weight:4, opacity:.92 }).addTo(map);
+      const metrics = routeMetrics(route);
+      setGeoStatus(prefix, 'success', buildTransportHtml(origin.nombre, dest.nombre, metrics.km, metrics.minCar, metrics.minBike, metrics.minWalk));
+    })
+    .catch(() => {
+      const metrics = fallbackMetrics(origin.coords[0], origin.coords[1], dest.coords[0], dest.coords[1]);
+      interPoiRouteLine = L.polyline([origin.coords, dest.coords], { color:eje.color, weight:3, opacity:.55, dashArray:'7 6' }).addTo(map);
+      setGeoStatus(prefix, 'success', buildTransportHtml(origin.nombre, dest.nombre, metrics.km, metrics.minCar, metrics.minBike, metrics.minWalk, true));
+    });
+}
+
+document.getElementById('detailClose').addEventListener('click', () => closePanels(true));
+document.getElementById('bsClose').addEventListener('click',     () => closePanels(true));
+document.getElementById('routeBannerCancel').addEventListener('click', () => exitRouteMode(true));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (routeMode) exitRouteMode(true); else closePanels(true); } });
+map.on('click', () => { if (routeMode) { exitRouteMode(true); return; } if (selectedLugarId) closePanels(true); });
+
+
+/* ---- Sincronización de layout al cambiar tamaño/orientación ---- */
+let resizeTimer = null;
+let lastMobileLayout = window.matchMedia('(max-width: 768px)').matches;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    map.invalidateSize({ pan: false, animate: false });
+
+    // Al cruzar el breakpoint, mueve la información del lugar activo entre
+    // panel lateral y hoja inferior para que nunca quede oculta.
+    if (isMobile !== lastMobileLayout && selectedLugarId && !routeMode) {
+      const selectedId = selectedLugarId;
+      lastMobileLayout = isMobile;
+      closePanels(false);
+      selectLugar(selectedId);
+      return;
+    }
+    lastMobileLayout = isMobile;
+  }, 140);
+});
+
+/* ---- Init: página independiente del Eje 4; no incluye selector de ejes. ---- */
+renderEje(4);
+</script>
+</body>
+</html>
