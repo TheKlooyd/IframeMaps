@@ -491,6 +491,106 @@
       stroke-linejoin: round !important;
     }
 
+    /* ================================================
+       MEJORAS DE RESPONSIVIDAD MÓVIL
+       Libera la altura fija de 570 px cuando la página
+       se abre directamente en un dispositivo móvil.
+    ================================================ */
+    @media (max-width: 768px) {
+      /* Ocupa toda la pantalla del teléfono */
+      html, body {
+        height: 100dvh !important;
+        min-height: 100dvh !important;
+        max-height: 100dvh !important;
+      }
+
+      /* El área de contenido crece de forma natural */
+      .main {
+        flex: 1;
+        height: auto !important;
+        min-height: 0;
+      }
+
+      /* Zoom del mapa: botones de al menos 44 px para dedos */
+      .leaflet-control-zoom a {
+        width: 40px !important;
+        height: 40px !important;
+        line-height: 40px !important;
+        font-size: 20px !important;
+      }
+
+      /* Mínimo 44 px de área táctil en todos los controles (WCAG 2.5.5) */
+      .btn-como-llegar,
+      .btn-conectar,
+      .bs-close,
+      .detail-close,
+      .route-banner-cancel {
+        min-height: 44px;
+        touch-action: manipulation;
+      }
+
+      /* Tabs de eje: área táctil suficiente */
+      .eje-tab {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+      }
+
+      /* Handle de arrastre más prominente */
+      .bs-drag {
+        width: 52px;
+        height: 5px;
+        margin-top: 14px;
+        margin-bottom: 2px;
+      }
+
+      /* Botones de cierre con área táctil completa */
+      .bs-close,
+      .detail-close {
+        width: 40px;
+        height: 40px;
+      }
+
+      /* Bottom-sheet a ancho completo, sin márgenes laterales */
+      .bottom-sheet {
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        border-radius: 22px 22px 0 0;
+        max-height: min(92dvh, 780px);
+      }
+
+      /* Respeta la barra de inicio (notch / home bar) en iOS y Android */
+      .bs-footer {
+        padding-bottom: max(20px, env(safe-area-inset-bottom)) !important;
+      }
+    }
+
+    /* Pantallas muy pequeñas (≤ 374 px: iPhone SE 1ª gen, Galaxy A, etc.) */
+    @media (max-width: 374px) {
+      .eje-tab         { padding: 0 8px; font-size: 9.5px; gap: 4px; }
+      .eje-tab-dot     { width: 7px; height: 7px; }
+      .bs-name         { font-size: 16px; }
+      .bs-desc         { font-size: 12px; line-height: 1.5; }
+      .btn-como-llegar { font-size: 12.5px; }
+      .btn-conectar    { font-size: 12px; }
+      .t-card-val      { font-size: 11px; }
+      .t-card-label    { font-size: 9px; }
+      .bs-body         { padding-left: 12px; padding-right: 12px; }
+      .bs-footer       { padding-left: 12px; padding-right: 12px; }
+    }
+
+    /* Dispositivos táctiles: eliminar estados hover que se pegan al tocar */
+    @media (hover: none) and (pointer: coarse) {
+      .loc-item:hover                   { background: none; border-color: transparent; }
+      .loc-item.active:hover            { background: var(--active-pale); border-color: var(--active); }
+      .btn-como-llegar:hover            { filter: none; transform: none; }
+      .btn-conectar:hover               { background: var(--white); border-color: var(--border); color: var(--black); }
+      .btn-conectar.route-active:hover  { background: var(--active-pale); border-color: var(--active); color: var(--active); }
+      .eje-tab:hover                    { background: rgba(255,255,255,.07); color: rgba(255,255,255,.6); }
+      .eje-tab.active:hover             { background: var(--bg); color: var(--black); }
+    }
+
 </style>
 </head>
 <body class="single-eje single-eje-1">
